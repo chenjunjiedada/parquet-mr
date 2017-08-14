@@ -69,7 +69,7 @@ public class TestStatisticsFilter {
         CompressionCodecName.GZIP,
         new HashSet<Encoding>(Arrays.asList(Encoding.PLAIN)),
         stats,
-        0L, 0L, valueCount, 0L, 0L);
+        0L, 0L, 0L, valueCount, 0L, 0L);
   }
 
   private static ColumnChunkMetaData getDoubleColumnMeta(org.apache.parquet.column.statistics.Statistics<?> stats,
@@ -79,7 +79,7 @@ public class TestStatisticsFilter {
         CompressionCodecName.GZIP,
         new HashSet<Encoding>(Arrays.asList(Encoding.PLAIN)),
         stats,
-        0L, 0L, valueCount, 0L, 0L);
+        0L, 0L, 0L, valueCount, 0L, 0L);
   }
 
   private static final IntColumn intColumn = intColumn("int.column");
