@@ -19,6 +19,7 @@
 package org.apache.parquet.hadoop;
 
 import static org.apache.parquet.hadoop.ParquetInputFormat.SPLIT_FILES;
+import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -171,6 +172,9 @@ public class ParquetRecordReader<T> extends RecordReader<Void, T> {
             + " expected: " + Arrays.toString(rowGroupOffsets)
             + " found: " + blocks);
       }
+
+    } else {
+      reader.filterRowGroups(getFilter(configuration));
     }
 
     if (!reader.getRowGroups().isEmpty()) {

@@ -412,7 +412,7 @@ public class TestParquetMetadataConverter {
     CompressionCodecName c = CompressionCodecName.GZIP;
     BinaryStatistics s = new BinaryStatistics();
     ColumnChunkMetaData md = ColumnChunkMetaData.get(p, t, c, e, s,
-            0, 0, 0, 0, 0);
+            0, 0, 0, 0, 0, 0);
     return md;
   }
 

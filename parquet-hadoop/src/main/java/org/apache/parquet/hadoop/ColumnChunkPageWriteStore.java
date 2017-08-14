@@ -29,6 +29,8 @@ import java.util.Set;
 
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
+import org.apache.parquet.column.values.bloom.Bloom;
+import org.apache.parquet.column.values.bloom.BloomDataWriter;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.page.DictionaryPage;
@@ -48,7 +50,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
 
   private static ParquetMetadataConverter parquetMetadataConverter = new ParquetMetadataConverter();
 
-  private static final class ColumnChunkPageWriter implements PageWriter {
+  private static final class ColumnChunkPageWriter implements PageWriter, BloomDataWriter {
 
     private final ColumnDescriptor path;
     private final BytesCompressor compressor;
@@ -56,6 +58,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
     private final ByteArrayOutputStream tempOutputStream = new ByteArrayOutputStream();
     private final ConcatenatingByteArrayCollector buf;
     private DictionaryPage dictionaryPage;
+    private Bloom bloomData;
 
     private long uncompressedLength;
     private long compressedLength;
@@ -200,6 +203,13 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
       }
       writer.writeDataPages(buf, uncompressedLength, compressedLength, totalStatistics,
           rlEncodings, dlEncodings, dataEncodings);
+
+      // update bloom filter offset.
+      // TODO: should we skip when dictionary page exist?
+      if (bloomData != null) {
+        writer.writeBloomFilter(bloomData);
+      }
+
       writer.endColumn();
       if (LOG.isDebugEnabled()) {
         LOG.debug(
@@ -238,6 +248,11 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
       return buf.memUsageString(prefix + " ColumnChunkPageWriter");
     }
 
+    @Override
+    public void writeBloomData(Bloom bloom) {
+      this.bloomData = bloom;
+    }
+
   }
 
   private final Map<ColumnDescriptor, ColumnChunkPageWriter> writers = new HashMap<ColumnDescriptor, ColumnChunkPageWriter>();
@@ -252,6 +267,11 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
 
   @Override
   public PageWriter getPageWriter(ColumnDescriptor path) {
+    return writers.get(path);
+  }
+
+  @Override
+  public BloomDataWriter getBloomDataWriter(ColumnDescriptor path) {
     return writers.get(path);
   }
 
