@@ -21,6 +21,7 @@ package org.apache.parquet.column.impl;
 import static org.apache.parquet.bytes.BytesInput.concat;
 
 import java.io.IOException;
+import java.util.Set;
 
 import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.values.bloom.BloomDataWriter;
@@ -66,11 +67,13 @@ final class ColumnWriterV1 implements ColumnWriter {
     // Current not support nested column.
     if (path.getPath().length == 1) {
       this.bloomDataWriter = bloomDataWriter;
-      String bloomCols = props.getBloomFilterColumnNames();
+      Set<String> bloomCols = props.getBloomFilterColumnNames();
 
-      if (bloomCols != null && bloomCols.indexOf(path.getPath()[0]) != -1) {
+      if (bloomCols != null && bloomCols.contains(path.getPath()[0])) {
           this.bloomData = Bloom.getBloomOnType(this.path.getType(),
-            props.getBloomFilterSize());
+            props.getBloomFilterSize(),
+            Bloom.HASH.MURMUR3_X64_128,
+            Bloom.ALGORITHM.BLOCK);
       }
     }
   }
@@ -196,7 +199,9 @@ final class ColumnWriterV1 implements ColumnWriter {
     definitionLevelColumn.writeInteger(definitionLevel);
     dataColumn.writeDouble(value);
     updateStatistics(value);
-    if (bloomData != null) bloomData.insert(value);
+    if (bloomData != null) {
+      bloomData.insert(value);
+    }
     accountForValueWritten();
   }
 
@@ -207,7 +212,9 @@ final class ColumnWriterV1 implements ColumnWriter {
     definitionLevelColumn.writeInteger(definitionLevel);
     dataColumn.writeFloat(value);
     updateStatistics(value);
-    if (bloomData != null) bloomData.insert(value);
+    if (bloomData != null) {
+      bloomData.insert(value);
+    }
     accountForValueWritten();
   }
 
@@ -218,7 +225,9 @@ final class ColumnWriterV1 implements ColumnWriter {
     definitionLevelColumn.writeInteger(definitionLevel);
     dataColumn.writeBytes(value);
     updateStatistics(value);
-    if (bloomData != null) bloomData.insert(value);
+    if (bloomData != null) {
+      bloomData.insert(value);
+    }
     accountForValueWritten();
   }
 
@@ -239,7 +248,9 @@ final class ColumnWriterV1 implements ColumnWriter {
     definitionLevelColumn.writeInteger(definitionLevel);
     dataColumn.writeInteger(value);
     updateStatistics(value);
-    if (bloomData != null) bloomData.insert(value);
+    if (bloomData != null) {
+      bloomData.insert(value);
+    }
     accountForValueWritten();
   }
 
@@ -250,7 +261,9 @@ final class ColumnWriterV1 implements ColumnWriter {
     definitionLevelColumn.writeInteger(definitionLevel);
     dataColumn.writeLong(value);
     updateStatistics(value);
-    if (bloomData != null) bloomData.insert(value);
+    if (bloomData != null) {
+      bloomData.insert(value);
+    }
     accountForValueWritten();
   }
 
@@ -286,21 +299,21 @@ final class ColumnWriterV1 implements ColumnWriter {
 
   @Override
   public long getBufferedSizeInMemory() {
-    long size = repetitionLevelColumn.getBufferedSize()
+    long bloomBufferSize = bloomData == null ? 0 : bloomData.getBufferedSize();
+    return repetitionLevelColumn.getBufferedSize()
       + definitionLevelColumn.getBufferedSize()
       + dataColumn.getBufferedSize()
-      + pageWriter.getMemSize();
-
-    return bloomData == null ? size : size + bloomData.getBufferedSize();
+      + pageWriter.getMemSize()
+      + bloomBufferSize;
   }
 
   public long allocatedSize() {
-    long size = repetitionLevelColumn.getAllocatedSize()
+    long bloomAllocatedSize = bloomData == null ? 0 : bloomData.getAllocatedSize();
+    return repetitionLevelColumn.getAllocatedSize()
       + definitionLevelColumn.getAllocatedSize()
       + dataColumn.getAllocatedSize()
-      + pageWriter.allocatedSize();
-
-    return bloomData == null ? size : size + bloomData.getAllocatedSize();
+      + pageWriter.allocatedSize()
+      + bloomAllocatedSize;
   }
 
   public String memUsageString(String indent) {

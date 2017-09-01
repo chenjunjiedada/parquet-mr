@@ -129,7 +129,8 @@ public class ParquetInputFormat<T> extends FileInputFormat<Void, T> {
    */
   public static final String DICTIONARY_FILTERING_ENABLED = "parquet.filter.dictionary.enabled";
 
-  public static final String BLOOM_FILTER_ENABLED = "parquet.filter.bloom.enabled";
+  // TODO naming
+  public static final String BLOOM_FILTERING_ENABLED = "parquet.filter.bloom.enabled";
   static final boolean BLOOM_FILTER_ENABLED_DEFAULT = false;
 
   /**
