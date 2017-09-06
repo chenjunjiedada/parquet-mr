@@ -21,8 +21,8 @@ package org.apache.parquet.column.values.bloom;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 
@@ -33,7 +33,6 @@ import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.io.ParquetEncodingException;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.PrimitiveType;
-
 
 /**
  * Bloom Filter is a compat structure to indicate whether an item is not in set or probably in set. Bloom class is
@@ -48,20 +47,35 @@ import org.apache.parquet.schema.PrimitiveType;
  */
 
 public abstract class Bloom<T extends Comparable<T>> {
+  // Hash strategy available for bloom filter.
   public enum HASH {
     MURMUR3_X64_128,
   }
 
+  // Bloom filter algorithm.
   public enum ALGORITHM {
     BLOCK,
   }
 
+  /**
+   * Default false positive probability value use to calculate optimal number of bits
+   * used by bloom filter.
+   */
   public final double FPP = 0.01;
+
+  // Bloom filter data header, including number of bytes, hash strategy and algorithm.
   public static final int BLOOM_HEADER_SIZE = 12;
+
+  // Bytes in a bucket.
   public static final int BYTES_PER_BUCKET = 32;
+
+  // Minimum bloom filter data size.
   public static final int MINIMUM_BLOOM_SIZE = 256;
 
+  // Hash strategy used in this bloom filter.
   public HASH bloomFilterHash = HASH.MURMUR3_X64_128;
+
+  // Algorithm applied of this bloom filter.
   public ALGORITHM bloomFilterAlgorithm = ALGORITHM.BLOCK;
 
   private HashSet<Long> elements = new HashSet<>();
@@ -69,9 +83,17 @@ public abstract class Bloom<T extends Comparable<T>> {
   private byte[] bitset;
   private int numBytes;
 
+  private int mask[] = new int[8];
+  private List<BytesInput> inputs= new ArrayList<>(4);
+
   /**
-   * Create bitset immediately if numBytes is not zero.
-   * @param numBytes
+   * Constructor of bloom filter, if numBytes is zero, bloom filter bitset
+   * will be created lazily and the number of bytes will be calculated through
+   * distinct values in cache.
+   * @param numBytes The number of bytes for bloom filter bitset, set to zero can
+   *                 let it calculate number automatically by using default FPP.
+   * @param hash The hash strategy bloom filter apply.
+   * @param algorithm The algorithm of bloom filter.
    */
   public Bloom(int numBytes, HASH hash, ALGORITHM algorithm) {
     if (numBytes != 0) {
@@ -83,7 +105,9 @@ public abstract class Bloom<T extends Comparable<T>> {
 
   /**
    * Construct the bloom filter with given bit set.
-   * @param bitset given bitset
+   * @param bitset The given bitset to construct bloom filter.
+   * @param hash The hash strategy bloom filter apply.
+   * @param algorithm The algorithm of bloom filter.
    */
   public Bloom(byte[] bitset, HASH hash, ALGORITHM algorithm) {
     this.bitset = bitset;
@@ -94,7 +118,9 @@ public abstract class Bloom<T extends Comparable<T>> {
 
   /**
    * Construct the bloom filter with given bit set.
-   * @param input given bitset
+   * @param input The given bitset to construct bloom filter.
+   * @param hash The hash strategy bloom filter apply.
+   * @param algorithm The algorithm of bloom filter.
    */
   public Bloom(ByteBuffer input, HASH hash, ALGORITHM algorithm) {
     if (input.isDirect()){
@@ -109,27 +135,29 @@ public abstract class Bloom<T extends Comparable<T>> {
   }
 
   /**
-   * Create a new bit set for bloom filter, at least 256 bits will be create.
+   * Create a new bitset for bloom filter, at least 256 bits will be create.
    * @param numBytes number of bytes for bit set.
    */
   public void initBitset(int numBytes) {
-    Preconditions.checkArgument((numBytes & (numBytes-1)) == 0,
-      "Bloom Filter size should be power of 2");
-    if (numBytes < MINIMUM_BLOOM_SIZE) numBytes = MINIMUM_BLOOM_SIZE;
-    if (numBytes > ParquetProperties.DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE)
+    if (numBytes < MINIMUM_BLOOM_SIZE) {
+      numBytes = MINIMUM_BLOOM_SIZE;
+    }
+
+    if (numBytes > ParquetProperties.DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE) {
       numBytes = ParquetProperties.DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE;
+    }
 
-    // wrap to 4 bytes align.
-    numBytes |= 0x11;
+    // 32 bytes alignment, one bucket.
+    numBytes = (numBytes + 0x1F) & (~0x1F);
 
-    ByteBuffer bytes = ByteBuffer.allocate(numBytes).order(ByteOrder.BIG_ENDIAN);
+    ByteBuffer bytes = ByteBuffer.allocate(numBytes);
     this.bitset = bytes.array();
     this.numBytes = numBytes;
   }
 
   /**
    * Create bitset from a given byte array.
-   * @param bitset given bitset.
+   * @param bitset Given bitset for bloom filter.
    */
   public void initBitset(byte[] bitset) {
     this.bitset = bitset;
@@ -137,73 +165,99 @@ public abstract class Bloom<T extends Comparable<T>> {
   }
 
   /**
-   * Get size of elements in buffer which stores in hash map.
+   * @return Bytes in buffered in this bloom filter.
    */
-  public long getBufferedSize() {
-    return bitset == null ? elements.size() * 8 : elements.size() * 8 + numBytes;
-  }
+  public BytesInput getBytes() {
+    inputs.clear();
 
-  /**
-   * Get bitset size.
-   * @return size of bitset
-   */
-  public long getBloomSize() {
-    return numBytes;
-  }
-
-  public long getAllocatedSize() {
-    return getBufferedSize();
-  }
-
-
-  public BytesInput getBytes() throws IOException {
-    // TODO: move out of here and reuse
-    List<BytesInput> inputs= new ArrayList<>(4);
-
-    // number of bytes.
+    // Add number of bytes.
     inputs.add(BytesInput.fromInt(numBytes));
 
-    // hash
+    // Add hash strategy
     inputs.add(BytesInput.fromInt(this.bloomFilterHash.ordinal()));
 
-    // algorithm
+    // Add bloom filter algorithm
     inputs.add(BytesInput.fromInt(this.bloomFilterAlgorithm.ordinal()));
 
-    // bitset.
+    // Add bitset.
     inputs.add(BytesInput.from(bitset, 0, bitset.length));
 
     return BytesInput.concat(inputs);
   }
 
+  private void setMask(int key) {
+    final int SALT[] = {0x47b6137b, 0x44974d91, 0x8824ad5b, 0xa2b7289d,
+      0x705495c7, 0x2df1424b, 0x9efc4947, 0x5c6bfb31};
+
+    Arrays.fill(mask, 0);
+
+    for (int i = 0; i < 8; ++i) {
+      mask[i] = key * SALT[i];
+    }
+
+    for (int i = 0; i < 8; ++i) {
+      mask[i] = mask[i] >> 27;
+    }
+
+    for (int i = 0; i < 8; ++i) {
+      mask[i] = 0x1 << mask[i];
+    }
+
+  }
+
   /**
-   * Add an element which represent by hash to bloom bitset.
+   * Add an element to bloom filter, the element content is represented by
+   * the hash value of its plain encoding result.
    * @param hash hash result of element.
    */
   public void bloomInsert(long hash) {
-    // The size of one bucket is set to 32 bytes.
-    int idx = (int)(hash >> 32) & (numBytes / BYTES_PER_BUCKET - 1);
+    int bucketIndex = (int)(hash >> 32) & (numBytes / BYTES_PER_BUCKET - 1);
     int key = (int)hash;
 
-    int mask[] = new int[BYTES_PER_BUCKET/4];
-    setMask(key, mask);
+    setMask(key);
 
-    byte[] bucket = new byte[BYTES_PER_BUCKET];
-
-    IntBuffer intBuffer = ByteBuffer.wrap(bucket).
-      order(ByteOrder.BIG_ENDIAN).asIntBuffer();
-
-    intBuffer.put(mask);
-
-    for (int i = 0; i < BYTES_PER_BUCKET; ++i) {
-      bitset[BYTES_PER_BUCKET * idx + i] |= bucket[i];
+    for (int i = 0; i < 8; i++) {
+      int bitsetIndex = bucketIndex * BYTES_PER_BUCKET + i * 4;
+      bitset[bitsetIndex] |= (byte)(mask[i] >>> 24);
+      bitset[bitsetIndex + 1] |= (byte)(mask[i] >>> 16);
+      bitset[bitsetIndex + 2] |= (byte)(mask[i] >>> 8);
+      bitset[bitsetIndex + 3] |= (byte)(mask[i]);
     }
   }
 
   /**
-   * Build bloom filter bitset according existing elements in buffer.
+   * Determine where an element is in set or not.
+   * @param hash the hash value of element plain encoding result.
+   * @return false if element is must not in set, true if element probably in set.
+   */
+  public boolean bloomFind(long hash) {
+    int bucketIndex = (int)(hash >> 32) & (numBytes / BYTES_PER_BUCKET - 1);
+
+    int key = (int)hash;
+
+    setMask(key);
+
+    for (int i = 0; i < 8; i++) {
+      byte set = 0;
+      int bitsetIndex = bucketIndex * BYTES_PER_BUCKET + i * 4;
+      set |= bitset[bitsetIndex] & ((byte)(mask[i] >>> 24));
+      set |= bitset[bitsetIndex + 1] & ((byte)(mask[i] >>> 16));
+      set |= bitset[bitsetIndex + 2] & ((byte)(mask[i] >>> 8));
+      set |= bitset[bitsetIndex + 3] & ((byte)mask[i]);
+      if (0 == set) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Bloom filter bitset can be created lazily, flush() will set bits for
+   * all elements in cache. If bitset was already created and set, it do nothing.
    */
   public void flush() {
-    if (bitset == null) {
+    if (!elements.isEmpty() && bitset == null) {
       initBitset(optimalNumOfBits(elements.size(), FPP)/8);
       for (long hash : elements) {
         bloomInsert(hash);
@@ -233,54 +287,26 @@ public abstract class Bloom<T extends Comparable<T>> {
   }
 
 
-  private int[] setMask(int key, int mask[]) {
-    final int SALT[] = {0x47b6137b, 0x44974d91, 0x8824ad5b, 0xa2b7289d, 0x705495c7, 0x2df1424b, 0x9efc4947, 0x5c6bfb31};
-
-    for (int i = 0; i < 8; ++i) {
-      mask[i] = key * SALT[i];
-    }
-
-    for (int i = 0; i < 8; ++i) {
-      mask[i] = mask[i] >> 27;
-    }
-
-    for (int i = 0; i < 8; ++i) {
-      mask[i] = 0x1 << mask[i];
-    }
-    return mask;
-  }
-
   /**
-   * Determine where an element is must not in set or probably in set.
-   * @param hash represent element
-   * @return false if element is must not in set, true if element probably in set.
-   */
-  public boolean bloomFind(long hash) {
-    int idx = (int)(hash >> 32) & (numBytes / 32 - 1);
-    int key = (int)hash;
-    int mask[] = new int[8];
-    setMask(key, mask);
-
-    IntBuffer intBuffer = ByteBuffer.wrap(bitset, 32 * idx, 32).
-      order(ByteOrder.BIG_ENDIAN).asIntBuffer();
-
-    int[] intset = new int[8];
-    intBuffer.get(intset);
-
-    for (int i = 0; i < 8; ++i) {
-      if (0 == (intset[i] & mask[i]))
-        return false;
-    }
-
-    return true;
-
-  }
-
-  /**
-   * Element is represented by hash in bloom filter. The hash function takes plain encoding of element as input.
+   * Element is represented by hash in bloom filter. The hash function takes plain encoding
+   * of element as input.
    */
   public Encoding getEncoding() {
     return Encoding.PLAIN;
+  }
+
+  /**
+   * @return Bytes buffered of bloom filter.
+   */
+  public long getBufferedSize() {
+    return elements.size() * 8 + numBytes;
+  }
+
+  /**
+   * @return Bytes buffered of bloom filter.
+   */
+  public long getAllocatedSize() {
+    return getBufferedSize();
   }
 
   public String memUsageString(String prefix) {
@@ -313,8 +339,6 @@ public abstract class Bloom<T extends Comparable<T>> {
         return null;
     }
   }
-
-  // TODO: add doc for public member and function.
 
   /**
    * Compute hash for values' plain encoding result.

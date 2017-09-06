@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 public class TestBloom {
   @Test
   public void testIntBloom () throws IOException {
-    Bloom.IntBloom intBloom = new Bloom.IntBloom(0, Bloom.HASH.MURMUR3_X64_128, Bloom.ALGORITHM.BLOCK);
+    Bloom.IntBloom intBloom = new Bloom.IntBloom(269, Bloom.HASH.MURMUR3_X64_128, Bloom.ALGORITHM.BLOCK);
     for(int i = 0; i<10; i++) {
       intBloom.insert(i);
     }
