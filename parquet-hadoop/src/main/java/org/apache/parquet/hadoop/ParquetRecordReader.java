@@ -173,9 +173,12 @@ public class ParquetRecordReader<T> extends RecordReader<Void, T> {
             + " found: " + blocks);
       }
 
-    } else {
+    }
+
+    /*else {
       reader.filterRowGroups(getFilter(configuration));
     }
+    */
 
     if (!reader.getRowGroups().isEmpty()) {
       checkDeltaByteArrayProblem(

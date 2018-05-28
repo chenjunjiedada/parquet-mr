@@ -39,6 +39,7 @@ import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.column.statistics.BinaryStatistics;
 import org.apache.parquet.column.statistics.LongStatistics;
+import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.format.Statistics;
 import org.apache.parquet.hadoop.metadata.*;
 import org.apache.parquet.hadoop.util.HiddenFileFilter;
@@ -144,16 +145,17 @@ public class TestParquetFileWriter {
     String colPath[] = {"foo"};
     ColumnDescriptor col = schema.getColumnDescription(colPath);
 
+    BinaryStatistics stats1 = new BinaryStatistics();
+
     ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
     w.start();
     w.startBlock(3);
     w.startColumn(col, 5, CODEC);
-    w.writeDataPage(2, 4, BytesInput.from(BYTES1), STATS1, BIT_PACKED, BIT_PACKED, PLAIN);
-    w.writeDataPage(3, 4, BytesInput.from(BYTES1), STATS1, BIT_PACKED, BIT_PACKED, PLAIN);
-    Bloom bloomData = new Bloom.BinaryBloom(0);
-    bloomData.insert(Binary.fromString("hello"));
-    bloomData.insert(Binary.fromString("world"));
-    bloomData.flush();
+    w.writeDataPage(2, 4, BytesInput.from(BYTES1),stats1, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.writeDataPage(3, 4, BytesInput.from(BYTES1),stats1, BIT_PACKED, BIT_PACKED, PLAIN);
+    Bloom bloomData = new Bloom(0);
+    bloomData.insert(bloomData.hash(Binary.fromString("hello")));
+    bloomData.insert(bloomData.hash(Binary.fromString("world")));
     long blStarts = w.getPos();
     w.writeBloomFilter(bloomData);
     w.endColumn();
@@ -165,8 +167,8 @@ public class TestParquetFileWriter {
       Arrays.asList(readFooter.getBlocks().get(0)), Arrays.asList(schema.getColumnDescription(colPath)));
     BloomDataReader bloomReader =  r.getBloomDataReader(readFooter.getBlocks().get(0));
     Bloom bloomDataRead = bloomReader.readBloomData(col);
-    assertTrue(bloomDataRead.find(Binary.fromString("hello")));
-    assertTrue(bloomDataRead.find(Binary.fromString("world")));
+    assertTrue(bloomDataRead.find(bloomData.hash(Binary.fromString("hello"))));
+    assertTrue(bloomDataRead.find(bloomData.hash(Binary.fromString("world"))));
   }
 
 

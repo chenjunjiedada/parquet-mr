@@ -354,7 +354,7 @@ public class ParquetFileWriter {
   public void writeBloomFilter(Bloom bloom) throws IOException {
     state = state.write();
     //TODO:
-    LOG.debug("{}: write bloom filter data : {} values", out.getPos(), bloom.getSize());
+    LOG.debug("{}: write bloom filter data : {} values", out.getPos(), bloom.getBufferedSize());
     currentChunkBloomFilterDataOffset = out.getPos();
     bloom.writeTo(out);
     //bloom.getBytes().writeAllTo(out);
