@@ -366,8 +366,4 @@ public class Bloom {
   public boolean find(long hash) {
     return contains(hash);
   }
-
-  public long getSize() {
-    return this.bitset.length + HEADER_SIZE;
-  }
 }

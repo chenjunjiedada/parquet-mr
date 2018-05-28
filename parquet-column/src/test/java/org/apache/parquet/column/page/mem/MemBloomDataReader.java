@@ -21,6 +21,7 @@ package org.apache.parquet.column.page.mem;
 import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.values.bloom.BloomDataReadStore;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.values.bloom.BloomUtility;
 
 /**
  * Created by root on 8/16/17.
@@ -29,6 +30,11 @@ public class MemBloomDataReader implements BloomDataReadStore {
 
   @Override
   public Bloom readBloomData(ColumnDescriptor path) {
+    return null;
+  }
+
+  @Override
+  public BloomUtility buildBloomUtility(ColumnDescriptor path) {
     return null;
   }
 }

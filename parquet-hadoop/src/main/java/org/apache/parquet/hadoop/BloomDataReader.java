@@ -22,9 +22,12 @@ import org.apache.parquet.Strings;
 import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.values.bloom.BloomDataReadStore;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.values.bloom.BloomUtility;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.io.ParquetDecodingException;
+
+import org.apache.parquet.schema.PrimitiveType;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -47,6 +50,34 @@ public class BloomDataReader implements BloomDataReadStore {
     for (ColumnChunkMetaData column : block.getColumns()) {
       columns.put(column.getPath().toDotString(), column);
     }
+  }
+
+  @Override
+  public BloomUtility buildBloomUtility(ColumnDescriptor desc) {
+    Bloom bloomData = readBloomData(desc);
+
+    String dotPath = Strings.join(desc.getPath(), ".");
+    ColumnChunkMetaData meta = columns.get(dotPath);
+    if (meta == null) {
+      throw new ParquetDecodingException(
+        "Cannot load Bloom data, unknown column: " + dotPath);
+    }
+
+    switch (meta.getType()){
+      case INT32:
+        return new BloomUtility.IntBloom(bloomData);
+      case INT64:
+        return new BloomUtility.LongBloom(bloomData);
+      case FLOAT:
+        return new BloomUtility.FloatBloom(bloomData);
+      case DOUBLE:
+        return new BloomUtility.DoubleBloom(bloomData);
+      case BINARY:
+        return new BloomUtility.BinaryBloom(bloomData);
+      default:
+        return null;
+    }
+
   }
 
   @Override

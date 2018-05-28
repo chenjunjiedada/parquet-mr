@@ -23,6 +23,7 @@ import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.values.bloom.BloomDataReadStore;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.statistics.Statistics;
+import org.apache.parquet.column.values.bloom.BloomUtility;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.filter2.predicate.Operators;
 import org.apache.parquet.filter2.predicate.UserDefinedPredicate;
@@ -92,8 +93,8 @@ public class BloomFilter implements FilterPredicate.Visitor<Boolean>{
       return BLOCK_CANNOT_MATCH;
     }
 
-    Bloom bloom = bloomFilterReader.readBloomData(col);
-    if (bloom != null && !bloom.find(value)) {
+    BloomUtility bloomUtility = bloomFilterReader.buildBloomUtility(col);
+    if (bloomUtility != null && !bloomUtility.contains(value)) {
       return BLOCK_CANNOT_MATCH;
     }
 

@@ -27,12 +27,19 @@ import org.apache.parquet.column.ColumnDescriptor;
 public interface BloomDataReadStore {
   /**
    * Returns a {@link Bloom} for the given column descriptor.
-   * The dictionary page bytes are uncompressed.
    *
    * @param path the descriptor of the column
    * @return the bloom dta for that column, or null if there isn't one
    */
   Bloom readBloomData(ColumnDescriptor path);
+
+  /**
+   * Returns a {@link BloomUtility} for the given column descriptor.
+   *
+   * @param path the descriptor of the column
+   * @return a concrete bloom filter utility
+   */
+  BloomUtility buildBloomUtility(ColumnDescriptor path);
 }
 
 
