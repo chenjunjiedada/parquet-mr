@@ -27,7 +27,7 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.SKIP_
 import static org.apache.parquet.hadoop.ParquetFileWriter.MAGIC;
 import static org.apache.parquet.hadoop.ParquetFileWriter.PARQUET_COMMON_METADATA_FILE;
 import static org.apache.parquet.hadoop.ParquetFileWriter.PARQUET_METADATA_FILE;
-import static org.apache.parquet.hadoop.ParquetInputFormat.BLOOM_FILTER_ENABLED;
+import static org.apache.parquet.hadoop.ParquetInputFormat.BLOOM_FILTERING_ENABLED;
 import static org.apache.parquet.hadoop.ParquetInputFormat.BLOOM_FILTER_ENABLED_DEFAULT;
 
 import java.io.Closeable;
@@ -547,7 +547,8 @@ public class ParquetFileReader implements Closeable {
    */
   @Deprecated
   public static ParquetFileReader open(Configuration conf, Path file) throws IOException {
-    return new ParquetFileReader(conf, file);
+    return new ParquetFileReader(HadoopInputFile.fromPath(file, conf),
+      HadoopReadOptions.builder(conf).build());
   }
 
   /**
@@ -560,7 +561,8 @@ public class ParquetFileReader implements Closeable {
    */
   @Deprecated
   public static ParquetFileReader open(Configuration conf, Path file, MetadataFilter filter) throws IOException {
-    return new ParquetFileReader(conf, file, filter);
+    return open(HadoopInputFile.fromPath(file, conf),
+      HadoopReadOptions.builder(conf).withMetadataFilter(filter).build());
   }
 
   /**
@@ -702,7 +704,7 @@ public class ParquetFileReader implements Closeable {
     if (footer == null) {
       try {
         // don't read the row groups because this.blocks is always set
-        this.footer = readFooter(converter, fileStatus.getLen(), fileStatus.getPath().toString(), f, SKIP_ROW_GROUPS);
+        this.footer = readFooter(file, options, f, converter);
       } catch (IOException e) {
         throw new ParquetDecodingException("Unable to read file footer", e);
       }
@@ -750,7 +752,7 @@ public class ParquetFileReader implements Closeable {
       levels.add(DICTIONARY);
     }
 
-    if (conf.getBoolean(BLOOM_FILTERING_ENABLED, BLOOM_FILTER_ENABLED_DEFAULT)) {
+    if (options.useBloomFilter()) {
       levels.add(BLOOM);
     }
 
@@ -922,19 +924,18 @@ public class ParquetFileReader implements Closeable {
     f.seek(bloomDataOffset);
 
     // Read bloom data header.
-    byte[] bytes = new byte[Bloom.BLOOM_HEADER_SIZE];
+    byte[] bytes = new byte[Bloom.HEADER_SIZE];
     f.read(bytes);
     ByteBuffer bloomHeader = ByteBuffer.wrap(bytes);
     IntBuffer headerBuffer = bloomHeader.order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
     int numBytes = headerBuffer.get();
-    Bloom.HASH hash = Bloom.HASH.values()[headerBuffer.get()];
-    Bloom.ALGORITHM algorithm = Bloom.ALGORITHM.values()[headerBuffer.get()];
+    Bloom.HashStrategy hash = Bloom.HashStrategy.values()[headerBuffer.get()];
+    Bloom.Algorithm algorithm = Bloom.Algorithm.values()[headerBuffer.get()];
 
     byte[] bitset = new byte[numBytes];
     f.readFully(bitset);
 
-    Bloom bloom = Bloom.getBloomOnType(meta.getType(), 0, hash, algorithm);
-    bloom.initBitset(bitset);
+    Bloom bloom = new Bloom(bitset);
 
     return bloom;
   }
