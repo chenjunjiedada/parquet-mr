@@ -70,10 +70,7 @@ final class ColumnWriterV1 implements ColumnWriter {
       Set<String> bloomCols = props.getBloomFilterColumnNames();
 
       if (bloomCols != null && bloomCols.contains(path.getPath()[0])) {
-          this.bloomData = new Bloom(
-            props.getBloomFilterSize(),
-            Bloom.HashStrategy.MURMUR3_X64_128,
-            Bloom.Algorithm.BLOCK);
+          this.bloomData = new Bloom(props.getBloomFilterSize());
       }
     }
   }
@@ -200,7 +197,7 @@ final class ColumnWriterV1 implements ColumnWriter {
     dataColumn.writeDouble(value);
     updateStatistics(value);
     if (bloomData != null) {
-      bloomData.insert(value);
+      bloomData.insert(bloomData.hash(value));
     }
     accountForValueWritten();
   }
@@ -213,7 +210,7 @@ final class ColumnWriterV1 implements ColumnWriter {
     dataColumn.writeFloat(value);
     updateStatistics(value);
     if (bloomData != null) {
-      bloomData.insert(value);
+      bloomData.insert(bloomData.hash(value));
     }
     accountForValueWritten();
   }
@@ -226,7 +223,7 @@ final class ColumnWriterV1 implements ColumnWriter {
     dataColumn.writeBytes(value);
     updateStatistics(value);
     if (bloomData != null) {
-      bloomData.insert(value);
+      bloomData.insert(bloomData.hash(value));
     }
     accountForValueWritten();
   }
@@ -249,7 +246,7 @@ final class ColumnWriterV1 implements ColumnWriter {
     dataColumn.writeInteger(value);
     updateStatistics(value);
     if (bloomData != null) {
-      bloomData.insert(value);
+      bloomData.insert(bloomData.hash(value));
     }
     accountForValueWritten();
   }
@@ -262,7 +259,7 @@ final class ColumnWriterV1 implements ColumnWriter {
     dataColumn.writeLong(value);
     updateStatistics(value);
     if (bloomData != null) {
-      bloomData.insert(value);
+      bloomData.insert(bloomData.hash(value));
     }
     accountForValueWritten();
   }
@@ -283,7 +280,6 @@ final class ColumnWriterV1 implements ColumnWriter {
     }
 
     if (bloomDataWriter != null && bloomData != null) {
-      bloomData.flush();
       bloomDataWriter.writeBloomData(bloomData);
     }
   }
@@ -308,7 +304,7 @@ final class ColumnWriterV1 implements ColumnWriter {
   }
 
   public long allocatedSize() {
-    long bloomAllocatedSize = bloomData == null ? 0 : bloomData.getAllocatedSize();
+    long bloomAllocatedSize = bloomData == null ? 0 : bloomData.getBufferedSize();
     return repetitionLevelColumn.getAllocatedSize()
       + definitionLevelColumn.getAllocatedSize()
       + dataColumn.getAllocatedSize()
@@ -322,8 +318,6 @@ final class ColumnWriterV1 implements ColumnWriter {
     b.append(definitionLevelColumn.memUsageString(indent + "  d:")).append("\n");
     b.append(dataColumn.memUsageString(indent + "  data:")).append("\n");
     b.append(pageWriter.memUsageString(indent + "  pages:")).append("\n");
-    if (bloomData != null)
-      b.append(bloomData.memUsageString(indent + " bloomData:")).append("\n");
     b.append(indent).append(String.format("  total: %,d/%,d", getBufferedSizeInMemory(), allocatedSize())).append("\n");
     b.append(indent).append("}\n");
     return b.toString();

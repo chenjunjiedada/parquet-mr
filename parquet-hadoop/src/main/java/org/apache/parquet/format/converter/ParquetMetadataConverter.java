@@ -1103,7 +1103,7 @@ public class ParquetMetadataConverter {
           ColumnPath path = getPath(metaData);
           ColumnChunkMetaData column = ColumnChunkMetaData.get(
               path,
-              messageType.getType(path.toArray()).asPrimitiveType(),
+              messageType.getType(path.toArray()).asPrimitiveType().getPrimitiveTypeName(),
               fromFormatCodec(metaData.codec),
               convertEncodingStats(metaData.getEncoding_stats()),
               fromFormatEncodings(metaData.encodings),
