@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -258,11 +258,12 @@ public class ParquetOutputFormat<T> extends FileOutputFormat<Void, T> {
 
   public static boolean getEnableBloomFilter(Configuration configuration) {
     return configuration.getBoolean(ENABLE_BLOOM_FILTER,
-      ParquetProperties.DEFAULT_BLOOM_FILTER_ENABLED);
+        ParquetProperties.DEFAULT_BLOOM_FILTER_ENABLED);
   }
 
   public static int getBloomFilterSize(Configuration configuration) {
-    return configuration.getInt(BLOOM_FILTER_SIZE, 0);
+    return configuration.getInt(BLOOM_FILTER_SIZE,
+        ParquetProperties.DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE);
   }
 
   public static int getMinRowCountForPageSizeCheck(Configuration configuration) {
