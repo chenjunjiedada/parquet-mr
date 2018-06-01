@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -99,6 +99,7 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
 
     List<BlockMetaData> filteredBlocks = new ArrayList<BlockMetaData>();
 
+    logger.info("RowGroupFilter: start filter block");
     for (BlockMetaData block : blocks) {
       boolean drop = false;
 
@@ -110,10 +111,10 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
         drop = DictionaryFilter.canDrop(filterPredicate, block.getColumns(), reader.getDictionaryReader(block));
       }
 
-
       if (!drop && levels.contains(FilterLevel.BLOOM)) {
+        logger.info("Start bloom filter");
         drop = BloomFilter.canDrop(filterPredicate, block.getColumns(), reader.getBloomDataReader(block));
-        if (drop) logger.debug("Block drop by bloom filter ");
+        if (drop) logger.info("Block drop by bloom filter ");
       }
 
       if(!drop) {

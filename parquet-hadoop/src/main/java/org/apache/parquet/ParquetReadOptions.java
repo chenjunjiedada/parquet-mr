@@ -92,7 +92,7 @@ public class ParquetReadOptions {
   }
 
   public boolean useBloomFilter() {
-    return useBloomFilter;
+    return true;
   }
 
   public FilterCompat.Filter getRecordFilter() {

@@ -716,6 +716,7 @@ class ClientSideMetadataSplitStrategy {
       List<BlockMetaData> filteredBlocks;
 
       totalRowGroups += blocks.size();
+      LOG.info("getSplits start filter row group");
       filteredBlocks = RowGroupFilter.filterRowGroups(filter, blocks, parquetMetaData.getFileMetaData().getSchema());
       rowGroupsDropped += blocks.size() - filteredBlocks.size();
 
