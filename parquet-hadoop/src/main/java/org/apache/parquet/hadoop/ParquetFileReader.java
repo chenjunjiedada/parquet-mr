@@ -758,6 +758,7 @@ public class ParquetFileReader implements Closeable {
 
     FilterCompat.Filter recordFilter = options.getRecordFilter();
     if (recordFilter != null) {
+
       return RowGroupFilter.filterRowGroups(levels, recordFilter, blocks, this);
     }
 

@@ -26,14 +26,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.parquet.column.values.bloom.*;
+import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.values.RandomStr;
 import org.apache.parquet.io.api.Binary;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
 
 public class TestBloom {
   @Test
