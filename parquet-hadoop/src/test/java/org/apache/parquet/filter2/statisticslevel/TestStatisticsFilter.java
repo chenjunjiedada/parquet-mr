@@ -66,18 +66,20 @@ public class TestStatisticsFilter {
     return ColumnChunkMetaData.get(ColumnPath.get("int", "column"),
         PrimitiveTypeName.INT32,
         CompressionCodecName.GZIP,
+        null,
         new HashSet<Encoding>(Arrays.asList(Encoding.PLAIN)),
         stats,
-        0L, 0L, valueCount, 0L, 0L);
+        0L, 0L, 0L, valueCount, 0L, 0L);
   }
 
   private static ColumnChunkMetaData getDoubleColumnMeta(DoubleStatistics stats, long valueCount) {
     return ColumnChunkMetaData.get(ColumnPath.get("double", "column"),
         PrimitiveTypeName.DOUBLE,
         CompressionCodecName.GZIP,
+        null,
         new HashSet<Encoding>(Arrays.asList(Encoding.PLAIN)),
         stats,
-        0L, 0L, valueCount, 0L, 0L);
+        0L, 0L, 0L, valueCount, 0L, 0L);
   }
 
   private static final IntColumn intColumn = intColumn("int.column");

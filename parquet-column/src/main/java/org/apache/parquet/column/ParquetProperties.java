@@ -46,6 +46,9 @@ import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridEncoder;
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridValuesWriter;
 import org.apache.parquet.schema.MessageType;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * This class represents all the configurable Parquet properties.
  *
@@ -61,6 +64,8 @@ public class ParquetProperties {
   public static final boolean DEFAULT_ESTIMATE_ROW_COUNT_FOR_PAGE_SIZE_CHECK = true;
   public static final int DEFAULT_MINIMUM_RECORD_COUNT_FOR_CHECK = 100;
   public static final int DEFAULT_MAXIMUM_RECORD_COUNT_FOR_CHECK = 10000;
+  public static final int DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE = 16 * 1024 * 1024;
+  public static final boolean DEFAULT_BLOOM_FILTER_ENABLED = false;
 
   private static final int MIN_SLAB_SIZE = 64;
 
@@ -92,11 +97,15 @@ public class ParquetProperties {
   private final int minRowCountForPageSizeCheck;
   private final int maxRowCountForPageSizeCheck;
   private final boolean estimateNextSizeCheck;
+  private final boolean enableBloomFilter;
+  private final Set<String> bloomFilterColumnNames;
+  private final int bloomFilterSize;
 
   private final int initialSlabSize;
 
   private ParquetProperties(WriterVersion writerVersion, int pageSize, int dictPageSize, boolean enableDict, int minRowCountForPageSizeCheck,
-                            int maxRowCountForPageSizeCheck, boolean estimateNextSizeCheck) {
+                            int maxRowCountForPageSizeCheck, boolean estimateNextSizeCheck, boolean enableBloomFilter,
+                            Set<String> bloomFilterColumnNames, int bloomFilterSize) {
     this.pageSizeThreshold = pageSize;
     this.initialSlabSize = CapacityByteArrayOutputStream
         .initialSlabSizeHeuristic(MIN_SLAB_SIZE, pageSizeThreshold, 10);
@@ -106,6 +115,9 @@ public class ParquetProperties {
     this.minRowCountForPageSizeCheck = minRowCountForPageSizeCheck;
     this.maxRowCountForPageSizeCheck = maxRowCountForPageSizeCheck;
     this.estimateNextSizeCheck = estimateNextSizeCheck;
+    this.enableBloomFilter = enableBloomFilter;
+    this.bloomFilterColumnNames = bloomFilterColumnNames;
+    this.bloomFilterSize = bloomFilterSize;
   }
 
   public ValuesWriter newRepetitionLevelWriter(ColumnDescriptor path) {
@@ -271,6 +283,12 @@ public class ParquetProperties {
     return enableDictionary;
   }
 
+  public boolean isBloomFilterEnabled() {return enableBloomFilter;}
+
+  public Set<String> getBloomFilterColumnNames() {return bloomFilterColumnNames;}
+
+  public int getBloomFilterSize() {return bloomFilterSize;}
+
   public ColumnWriteStore newColumnWriteStore(MessageType schema,
                                               PageWriteStore pageStore) {
     switch (writerVersion) {
@@ -311,6 +329,9 @@ public class ParquetProperties {
     private int minRowCountForPageSizeCheck = DEFAULT_MINIMUM_RECORD_COUNT_FOR_CHECK;
     private int maxRowCountForPageSizeCheck = DEFAULT_MAXIMUM_RECORD_COUNT_FOR_CHECK;
     private boolean estimateNextSizeCheck = DEFAULT_ESTIMATE_ROW_COUNT_FOR_PAGE_SIZE_CHECK;
+    private boolean enableBloomFilter = DEFAULT_BLOOM_FILTER_ENABLED;
+    private int bloomFilterSize = DEFAULT_MAXIMUM_BLOOM_FILTER_SIZE;
+    private Set<String> bloomFilterColumnNames = new HashSet<>();
 
     private Builder() {
     }
@@ -322,6 +343,9 @@ public class ParquetProperties {
       this.minRowCountForPageSizeCheck = toCopy.minRowCountForPageSizeCheck;
       this.maxRowCountForPageSizeCheck = toCopy.maxRowCountForPageSizeCheck;
       this.estimateNextSizeCheck = toCopy.estimateNextSizeCheck;
+      this.enableBloomFilter = toCopy.enableBloomFilter;
+      this.bloomFilterSize = toCopy.bloomFilterSize;
+      this.bloomFilterColumnNames = toCopy.bloomFilterColumnNames;
     }
 
     /**
@@ -362,6 +386,44 @@ public class ParquetProperties {
     }
 
     /**
+     * Set to enable bloom filter.
+     *
+     * @param enableBloomFilter a boolean to indicate whether to enable bloom filter.
+     * @return this builder for method chaining.
+     */
+    public Builder withBloomFilterEnabled(boolean enableBloomFilter) {
+      this.enableBloomFilter = enableBloomFilter;
+      return this;
+    }
+
+    /**
+     * Set bloom filter size for a column.
+     *
+     * @param size bytes for a bloom filter of column.
+     * @return this builder for method chaining
+     */
+    public Builder withBloomFilterSize(int size) {
+      //Preconditions.checkArgument(size > 0, "invalid bloom filter size");
+      this.bloomFilterSize = size;
+      return this;
+    }
+
+    /**
+     * Set which column to enable bloom filter.
+     *
+     * @param names column names to enable bloom filter.
+     * @return this builder for method chaining
+     */
+    public Builder withBloomFilterColumnNames(String names) {
+      if (names == null) return this;
+      String[] cols = names.split(",");
+      for(String col : cols) {
+        this.bloomFilterColumnNames.add(col);
+      }
+      return this;
+    }
+
+    /**
      * Set the {@link WriterVersion format version}.
      *
      * @param version a {@code WriterVersion}
@@ -395,7 +457,7 @@ public class ParquetProperties {
     public ParquetProperties build() {
       return new ParquetProperties(writerVersion, pageSize, dictPageSize,
           enableDict, minRowCountForPageSizeCheck, maxRowCountForPageSizeCheck,
-          estimateNextSizeCheck);
+          estimateNextSizeCheck, enableBloomFilter, bloomFilterColumnNames, bloomFilterSize);
     }
   }
 }

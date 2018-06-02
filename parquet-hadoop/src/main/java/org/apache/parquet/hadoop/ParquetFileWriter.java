@@ -44,6 +44,7 @@ import org.apache.parquet.Strings;
 import org.apache.parquet.Version;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.BytesUtils;
+import org.apache.parquet.column.values.bloom.Bloom;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.EncodingStats;
@@ -131,6 +132,7 @@ public class ParquetFileWriter {
   private long currentChunkValueCount;            // set in startColumn
   private long currentChunkFirstDataPage;         // set in startColumn (out.pos())
   private long currentChunkDictionaryPageOffset;  // set in writeDictionaryPage
+  private long currentChunkBloomFilterDataOffset; // set in writeBloomData
 
   /**
    * Captures the order in which methods should be called
@@ -342,6 +344,14 @@ public class ParquetFileWriter {
   }
 
 
+  public void writeBloomFilter(Bloom bloom) throws IOException {
+    state = state.write();
+    LOG.debug("{}: write bloom filter data : {} values", out.getPos(), bloom.getAllocatedSize());
+    currentChunkBloomFilterDataOffset = out.getPos();
+    bloom.getBytes().writeAllTo(out);
+  }
+
+
   /**
    * writes a single page
    * @param valueCount count of values
@@ -467,6 +477,7 @@ public class ParquetFileWriter {
         currentStatistics,
         currentChunkFirstDataPage,
         currentChunkDictionaryPageOffset,
+        currentChunkBloomFilterDataOffset,
         currentChunkValueCount,
         compressedLength,
         uncompressedLength));
@@ -576,6 +587,7 @@ public class ParquetFileWriter {
           chunk.getStatistics(),
           newChunkStart,
           newChunkStart,
+          chunk.getBloomFilterDataOffset(),
           chunk.getValueCount(),
           chunk.getTotalSize(),
           chunk.getTotalUncompressedSize()));
