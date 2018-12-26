@@ -25,7 +25,7 @@ public abstract class BloomUtility<T extends Comparable<T>> {
   public abstract boolean contains(T value);
 
   public static class IntBloom extends BloomUtility<Integer> {
-    public IntBloom (Bloom Bloom) {
+    public IntBloom (Bloom bloom) {
       this.bloom = bloom;
     }
 
@@ -36,7 +36,7 @@ public abstract class BloomUtility<T extends Comparable<T>> {
   }
 
   public static class LongBloom extends BloomUtility<Long> {
-    public LongBloom (Bloom Bloom) {
+    public LongBloom (Bloom bloom) {
       this.bloom = bloom;
     }
 
@@ -47,7 +47,7 @@ public abstract class BloomUtility<T extends Comparable<T>> {
   }
 
   public static class DoubleBloom extends BloomUtility<Double> {
-    public DoubleBloom (Bloom Bloom) {
+    public DoubleBloom (Bloom bloom) {
       this.bloom = bloom;
     }
 
@@ -58,7 +58,7 @@ public abstract class BloomUtility<T extends Comparable<T>> {
   }
 
   public static class FloatBloom extends BloomUtility<Float> {
-    public FloatBloom (Bloom Bloom) {
+    public FloatBloom (Bloom bloom) {
       this.bloom = bloom;
     }
 
@@ -69,7 +69,7 @@ public abstract class BloomUtility<T extends Comparable<T>> {
   }
 
   public static class BinaryBloom extends BloomUtility<Binary> {
-    public BinaryBloom (Bloom Bloom) {
+    public BinaryBloom (Bloom bloom) {
       this.bloom = bloom;
     }
 

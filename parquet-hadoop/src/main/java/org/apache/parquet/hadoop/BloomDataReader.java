@@ -55,6 +55,9 @@ public class BloomDataReader implements BloomDataReadStore {
   @Override
   public BloomUtility buildBloomUtility(ColumnDescriptor desc) {
     Bloom bloomData = readBloomData(desc);
+    if (bloomData == null) {
+      return null;
+    }
 
     String dotPath = Strings.join(desc.getPath(), ".");
     ColumnChunkMetaData meta = columns.get(dotPath);

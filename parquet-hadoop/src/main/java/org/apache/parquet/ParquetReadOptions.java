@@ -32,20 +32,21 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
+import static org.apache.parquet.hadoop.ParquetInputFormat.BLOOM_FILTER_ENABLED_DEFAULT;
 
 // Internal use only
 public class ParquetReadOptions {
   private static final boolean RECORD_FILTERING_ENABLED_DEFAULT = true;
   private static final boolean STATS_FILTERING_ENABLED_DEFAULT = true;
   private static final boolean DICTIONARY_FILTERING_ENABLED_DEFAULT = true;
-  public static final boolean DEFAULT_BLOOM_FILTER_ENABLED = false;
+  public static final boolean DEFAULT_BLOOM_FILTER_ENABLED = true;
   private static final int ALLOCATION_SIZE_DEFAULT = 8388608; // 8MB
 
   private final boolean useSignedStringMinMax;
   private final boolean useStatsFilter;
   private final boolean useDictionaryFilter;
   private final boolean useRecordFilter;
-  private final boolean useBloomFilter = true;
+  private final boolean useBloomFilter;
   private final FilterCompat.Filter recordFilter;
   private final ParquetMetadataConverter.MetadataFilter metadataFilter;
   private final CompressionCodecFactory codecFactory;
@@ -72,6 +73,7 @@ public class ParquetReadOptions {
     this.codecFactory = codecFactory;
     this.allocator = allocator;
     this.maxAllocationSize = maxAllocationSize;
+    this.useBloomFilter = DEFAULT_BLOOM_FILTER_ENABLED;
     this.properties = Collections.unmodifiableMap(properties);
   }
 
@@ -92,7 +94,7 @@ public class ParquetReadOptions {
   }
 
   public boolean useBloomFilter() {
-    return true;
+    return useBloomFilter;
   }
 
   public FilterCompat.Filter getRecordFilter() {
