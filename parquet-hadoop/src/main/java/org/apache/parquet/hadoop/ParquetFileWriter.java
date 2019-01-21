@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -50,6 +50,8 @@ import org.apache.parquet.column.EncodingStats;
 import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.statistics.Statistics;
+import org.apache.parquet.column.values.bloomfilter.BloomFilter;
+import org.apache.parquet.example.DummyRecordConverter;
 import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
 import org.apache.parquet.format.Util;
@@ -110,12 +112,18 @@ public class ParquetFileWriter {
   private final List<List<ColumnIndex>> columnIndexes = new ArrayList<>();
   private final List<List<OffsetIndex>> offsetIndexes = new ArrayList<>();
 
+  // The Bloom filters
+  private final List<List<BloomFilter>> bloomFilters = new ArrayList<>();
+
   // row group data
   private BlockMetaData currentBlock; // appended to by endColumn
 
   // The column/offset indexes for the actual block
   private List<ColumnIndex> currentColumnIndexes;
   private List<OffsetIndex> currentOffsetIndexes;
+
+  // The Bloom filter for the actual block
+  private List<BloomFilter> currentBloomFilters;
 
   // row group data set at the start of a row group
   private long currentRecordCount; // set in startBlock
@@ -339,6 +347,8 @@ public class ParquetFileWriter {
 
     currentColumnIndexes = new ArrayList<>();
     currentOffsetIndexes = new ArrayList<>();
+
+    currentBloomFilters = new ArrayList<>();
   }
 
   /**
@@ -534,6 +544,14 @@ public class ParquetFileWriter {
   }
 
   /**
+   * Write a Bloom filter
+   * @param bloomFilter the bloom filter of column values
+   */
+  void writeBloomFilter(BloomFilter bloomFilter)  {
+    currentBloomFilters.add(bloomFilter);
+  }
+
+  /**
    * Writes a column chunk at once
    * @param descriptor the descriptor of the column
    * @param valueCount the value count in this column
@@ -545,6 +563,7 @@ public class ParquetFileWriter {
    * @param totalStats accumulated statistics for the column chunk
    * @param columnIndexBuilder the builder object for the column index
    * @param offsetIndexBuilder the builder object for the offset index
+   * @param bloomFilter the bloom filter for this column
    * @param rlEncodings the RL encodings used in this column chunk
    * @param dlEncodings the DL encodings used in this column chunk
    * @param dataEncodings the data encodings used in this column chunk
@@ -560,14 +579,18 @@ public class ParquetFileWriter {
       Statistics<?> totalStats,
       ColumnIndexBuilder columnIndexBuilder,
       OffsetIndexBuilder offsetIndexBuilder,
+      BloomFilter bloomFilter,
       Set<Encoding> rlEncodings,
       Set<Encoding> dlEncodings,
       List<Encoding> dataEncodings) throws IOException {
     startColumn(descriptor, valueCount, compressionCodecName);
 
     state = state.write();
+
     if (dictionaryPage != null) {
       writeDictionaryPage(dictionaryPage);
+    }  else if (bloomFilter != null) {
+      currentBloomFilters.add(bloomFilter);
     }
     LOG.debug("{}: write data pages", out.getPos());
     long headersSize = bytes.size() - compressedTotalPageSize;
@@ -634,8 +657,10 @@ public class ParquetFileWriter {
     blocks.add(currentBlock);
     columnIndexes.add(currentColumnIndexes);
     offsetIndexes.add(currentOffsetIndexes);
+    bloomFilters.add(currentBloomFilters);
     currentColumnIndexes = null;
     currentOffsetIndexes = null;
+    currentBloomFilters =  null;
     currentBlock = null;
   }
 
@@ -823,6 +848,7 @@ public class ParquetFileWriter {
     state = state.end();
     serializeColumnIndexes(columnIndexes, blocks, out);
     serializeOffsetIndexes(offsetIndexes, blocks, out);
+    serializeBloomFilters(bloomFilters, blocks, out);
     LOG.debug("{}: end", out.getPos());
     this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
     serializeFooter(footer, out);
@@ -868,6 +894,28 @@ public class ParquetFileWriter {
         long offset = out.getPos();
         Util.writeOffsetIndex(ParquetMetadataConverter.toParquetOffsetIndex(offsetIndex), out);
         column.setOffsetIndexReference(new IndexReference(offset, (int) (out.getPos() - offset)));
+      }
+    }
+  }
+
+  private static void serializeBloomFilters(
+    List<List<BloomFilter>> bloomFilters,
+    List<BlockMetaData> blocks,
+    PositionOutputStream out) throws IOException {
+    LOG.debug("{}: bloom filters", out.getPos());
+    for (int bIndex = 0, bSize = blocks.size(); bIndex < bSize; ++bIndex) {
+      List<ColumnChunkMetaData> columns = blocks.get(bIndex).getColumns();
+      List<BloomFilter> blockBloomFilters = bloomFilters.get(bIndex);
+      if (blockBloomFilters.isEmpty()) continue;
+      for (int cIndex = 0, cSize = columns.size(); cIndex < cSize; ++cIndex) {
+        BloomFilter bloomFilter = blockBloomFilters.get(cIndex);
+        if (bloomFilter == null) {
+          continue;
+        }
+        ColumnChunkMetaData column = columns.get(cIndex);
+        long offset = out.getPos();
+        column.setBloomFilterOffset(offset);
+        bloomFilter.writeTo(out);
       }
     }
   }
