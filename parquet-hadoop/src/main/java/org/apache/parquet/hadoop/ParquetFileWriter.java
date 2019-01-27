@@ -61,6 +61,7 @@ import org.apache.parquet.column.impl.ColumnWriteStoreV1;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.column.statistics.Statistics;
+import org.apache.parquet.column.values.bloomfilter.BlockSplitBloomFilter;
 import org.apache.parquet.column.values.bloomfilter.BloomFilter;
 import org.apache.parquet.example.DummyRecordConverter;
 import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel;
@@ -602,7 +603,7 @@ public class ParquetFileWriter {
     if (dictionaryPage != null) {
       writeDictionaryPage(dictionaryPage);
     }  else if (bloomFilter != null) {
-      currentBloomFilters.add(bloomFilter);
+        currentBloomFilters.add(bloomFilter);
     }
     LOG.debug("{}: write data pages", out.getPos());
     long headersSize = bytes.size() - compressedTotalPageSize;

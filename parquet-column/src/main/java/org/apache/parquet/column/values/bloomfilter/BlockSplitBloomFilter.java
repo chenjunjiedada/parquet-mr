@@ -284,7 +284,7 @@ public class BlockSplitBloomFilter implements BloomFilter {
 
   @Override
   public long hash(Binary value) {
-    return hashFunction.hashBytes(value.getBytes()).asLong();
+    return hashFunction.hashBytes(value.toByteBuffer()).asLong();
   }
 
   @Override

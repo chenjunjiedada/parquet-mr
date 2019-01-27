@@ -148,6 +148,7 @@ public class ParquetOutputFormat<T> extends FileOutputFormat<Void, T> {
   public static final String COLUMN_INDEX_TRUNCATE_LENGTH = "parquet.columnindex.truncate.length";
   public static final String BLOOM_FILTER_COLUMN_NAMES = "parquet.bloom.filter.column.names";
   public static final String BLOOM_FILTER_EXPECTED_NDV = "parquet.bloom.filter.expected.ndv";
+  public static final String BLOOM_FILTER_MAX_SIZES = "parquet.bloom.filter.max.sizes";
   public static final String PAGE_ROW_COUNT_LIMIT = "parquet.page.row.count.limit";
 
   public static JobSummaryLevel getJobSummaryLevel(Configuration conf) {
@@ -214,7 +215,7 @@ public class ParquetOutputFormat<T> extends FileOutputFormat<Void, T> {
     return getEnableDictionary(getConfiguration(jobContext));
   }
 
-  public static Map<String, Long> getBloomFilterColumnExpectedNDVs(Configuration conf) {
+  public static Map<String, Long> getBloomFilterExpectedNDVs(Configuration conf) {
     Map<String, Long> kv = new HashMap<>();
     String columnNamesConf = conf.get(BLOOM_FILTER_COLUMN_NAMES);
     String expectedNDVsConf = conf.get(BLOOM_FILTER_EXPECTED_NDV);
@@ -232,6 +233,29 @@ public class ParquetOutputFormat<T> extends FileOutputFormat<Void, T> {
       }
     } else {
       LOG.warn("Bloom filter column names are not match expected NDVs");
+    }
+
+    return kv;
+  }
+
+  public static Map<String, Long> getBloomFilterMaxSizes(Configuration conf) {
+    Map<String, Long> kv = new HashMap<>();
+    String columnNamesConf = conf.get(BLOOM_FILTER_COLUMN_NAMES);
+    String expectedNDVsConf = conf.get(BLOOM_FILTER_MAX_SIZES);
+
+    if (columnNamesConf == null || expectedNDVsConf == null) {
+      return kv;
+    }
+
+    String[] columnNames = columnNamesConf.split(",");
+    String[] maxSizes = expectedNDVsConf.split(",");
+
+    if (columnNames.length == maxSizes.length) {
+      for (int i = 0; i < columnNames.length; i++) {
+        kv.put(columnNames[i], Long.getLong(maxSizes[i]));
+      }
+    } else {
+      LOG.warn("Bloom filter column names are not match max sizes");
     }
 
     return kv;
@@ -415,7 +439,8 @@ public class ParquetOutputFormat<T> extends FileOutputFormat<Void, T> {
         .withPageSize(getPageSize(conf))
         .withDictionaryPageSize(getDictionaryPageSize(conf))
         .withDictionaryEncoding(getEnableDictionary(conf))
-        .withBloomFilterInfo(getBloomFilterColumnExpectedNDVs(conf))
+        .withBloomFilterExpectedNdvs(getBloomFilterExpectedNDVs(conf))
+        .withBloomFilterMaxSizes(getBloomFilterMaxSizes(conf))
         .withWriterVersion(getWriterVersion(conf))
         .estimateRowCountForPageSizeCheck(getEstimatePageSizeCheck(conf))
         .withMinRowCountForPageSizeCheck(getMinRowCountForPageSizeCheck(conf))
